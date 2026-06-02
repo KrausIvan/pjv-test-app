@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PJV / Java — procvičování ke zkoušce</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+</head>
+<body>
+  <!-- ========================= TOPBAR ========================= -->
+  <header class="topbar">
+    <button id="menuToggle" class="icon-btn" aria-label="Menu">☰</button>
+    <div class="brand">
+      <span class="brand-logo">☕</span>
+      <span class="brand-text">PJV&nbsp;<b>Trenér</b></span>
+    </div>
+    <div class="search-wrap">
+      <input id="globalSearch" type="search" placeholder="Hledat otázku, klíčové slovo…" autocomplete="off" />
+    </div>
+    <div class="topbar-progress" id="topbarProgress" title="Naučeno">
+      <div class="mini-bar"><div class="mini-bar-fill" id="miniBarFill"></div></div>
+      <span id="miniBarLabel">0 %</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ========================= SIDEBAR ========================= -->
+    <aside class="sidebar" id="sidebar">
+      <nav class="modes">
+        <button class="mode-btn active" data-mode="dashboard"><span class="ic">▣</span> Přehled / Dashboard</button>
+        <button class="mode-btn" data-mode="overview"><span class="ic">≣</span> Kompletní přehled</button>
+        <button class="mode-btn" data-mode="flashcards"><span class="ic">▤</span> Flashcards</button>
+        <button class="mode-btn" data-mode="abcd"><span class="ic">▦</span> ABCD test</button>
+        <button class="mode-btn" data-mode="truefalse"><span class="ic">✓✗</span> Pravda / Nepravda</button>
+        <button class="mode-btn" data-mode="written"><span class="ic">✎</span> Psaná odpověď</button>
+        <button class="mode-btn" data-mode="weak"><span class="ic">★</span> Slabá místa</button>
+        <button class="mode-btn" data-mode="exam"><span class="ic">⏱</span> Náhodný test</button>
+        <button class="mode-btn" data-mode="stats"><span class="ic">📊</span> Statistiky</button>
+      </nav>
+
+      <div class="sidebar-section">
+        <div class="sidebar-title">Kategorie</div>
+        <div id="categoryList" class="category-list"></div>
+      </div>
+
+      <div class="sidebar-section">
+        <button id="resetProgress" class="danger-btn">Vynulovat pokrok</button>
+      </div>
+    </aside>
+
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ========================= MAIN ========================= -->
+    <main class="main" id="main">
+      <!-- views are injected here -->
+    </main>
+  </div>
+
+  <!-- toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="questions.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
