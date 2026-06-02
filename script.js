@@ -96,10 +96,18 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
 }
 
+const SENTENCE_ABBR = /\b(np|např|tj|tzn|tzv|atd|apod|aj|mj|popř|resp|cca|kap|obr|str|angl|lat)\.$/i;
 function firstSentence(text) {
   const clean = text.replace(/\s+/g, " ").trim();
-  const m = clean.match(/^(.*?[\.\!\?])(\s|$)/);
-  let s = m ? m[1] : clean;
+  const re = /[\.\!\?](\s|$)/g;
+  let m, end = -1;
+  while ((m = re.exec(clean)) !== null) {
+    const upto = clean.slice(0, m.index + 1);
+    if (SENTENCE_ABBR.test(upto)) continue;   // tečka u zkratky není konec věty
+    end = m.index + 1;
+    break;
+  }
+  let s = end > 0 ? clean.slice(0, end) : clean;
   if (s.length > 120) s = s.slice(0, 117).trim() + "…";
   return s;
 }
@@ -404,9 +412,13 @@ function buildQuestionCard(q) {
       card.className = "q-card open" + (ns ? " status-" + ns : "");
       row.querySelectorAll(".status-btn").forEach(x =>
         x.classList.toggle("sel", x.classList.contains(store.status[q.id] || "__")));
-      // refresh badge
-      const badgeWrap = head.querySelector(".q-badges");
-      const base = badges.slice(0, badges.length).join("");
+      // refresh odznaku stavu v hlavičce
+      const nb = [];
+      if (q.type === "trap") nb.push(`<span class="badge type-trap">chyták</span>`);
+      if (q.type === "code") nb.push(`<span class="badge type-code">kód</span>`);
+      nb.push(`<span class="badge diff-${q.difficulty}">${q.difficulty}</span>`);
+      if (ns) nb.push(`<span class="badge status ${ns}">${statusLabel(ns)}</span>`);
+      head.querySelector(".q-badges").innerHTML = nb.join("");
     });
     row.appendChild(b);
   });
