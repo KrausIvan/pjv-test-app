@@ -186,11 +186,11 @@ option { background: var(--bg-2); color: var(--text); }
   display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
   margin-bottom: 18px;
 }
-.controls .pill {
+.pill {
   background: var(--bg-3); border: 1px solid var(--line); color: var(--text);
   padding: 8px 13px; border-radius: 9px; font-size: 13px; outline: none;
+  transition: .12s;
 }
-.pill { transition: .12s; }
 .pill:hover { border-color: var(--line-2); }
 .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .spacer { flex: 1; }
