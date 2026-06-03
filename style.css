@@ -59,13 +59,23 @@ option { background: var(--bg-2); color: var(--text); }
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
 }
-.brand { display: flex; align-items: center; gap: 9px; font-size: 18px; white-space: nowrap; }
+.brand { display: flex; align-items: center; gap: 9px; font-size: 18px; white-space: nowrap; cursor: pointer; user-select: none; }
 .brand-logo { font-size: 21px; }
 .brand-text b { color: var(--accent); font-weight: 700; }
 .icon-btn {
   display: none; background: var(--bg-3); border: 1px solid var(--line);
   color: var(--text); width: 40px; height: 40px; border-radius: 10px; font-size: 18px;
 }
+.back-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-3); border: 1px solid var(--line); color: var(--text);
+  height: 40px; padding: 0 14px 0 11px; border-radius: 10px; font-size: 14px; font-weight: 500;
+  transition: border-color .12s, background .12s; white-space: nowrap; flex-shrink: 0;
+}
+.back-btn:hover { border-color: var(--accent); background: var(--bg-2); }
+.back-btn .bb-arrow { font-size: 17px; line-height: 1; }
+.back-btn.hidden { display: none; }
+.hidden { display: none !important; }
 .search-wrap { flex: 1; max-width: 560px; margin: 0 auto; }
 #globalSearch {
   width: 100%; height: 40px; padding: 0 16px;
@@ -412,6 +422,8 @@ pre.code {
   .main { padding: 20px 16px 50px; }
   .topbar-progress { display: none; }
   .brand-text { display: none; }
+  .back-btn { padding: 0; width: 40px; justify-content: center; }
+  .back-btn .bb-text { display: none; }
   .flashcard { height: 420px; }
 }
 @media (max-width: 520px) {

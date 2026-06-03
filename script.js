@@ -114,8 +114,45 @@ function firstSentence(text) {
 
 /* ---------------- globální UI stav ---------------- */
 let currentMode = "dashboard";
-let currentCategory = "all";   // filtr kategorie
+let currentCategory = "all";   // filtr kategorie (sdílený všemi režimy)
 let searchTerm = "";
+
+/* ---------------- navigace + historie ---------------- */
+let navStack = [];   // zásobník předchozích stavů { mode, category }
+
+// uživatelská navigace na nový režim (zaznamená se do historie pro tlačítko Zpět)
+function navigate(mode) {
+  if (mode !== currentMode) {
+    navStack.push({ mode: currentMode, category: currentCategory });
+  }
+  renderMode(mode);
+  updateBackBtn();
+}
+// zpět na předchozí stránku (i s dříve zvolenou kategorií)
+function goBack() {
+  const prev = navStack.pop();
+  if (!prev) { renderMode("dashboard"); updateBackBtn(); return; }
+  currentCategory = prev.category;
+  syncCategoryUI();
+  renderMode(prev.mode);
+  updateBackBtn();
+}
+function updateBackBtn() {
+  const b = $("#backBtn");
+  if (b) b.classList.toggle("hidden", navStack.length === 0);
+}
+
+// sdílené <option> pro výběr kategorie
+function catOptionsHtml() {
+  return `<option value="all">Všechny kategorie</option>` +
+    CATEGORIES.map(c => `<option value="${c.key}">${escapeHtml(c.label)}</option>`).join("");
+}
+// změna kategorie z libovolného režimu → aktualizuje sdílený stav a překreslí
+function onCategoryChange(value, rerender) {
+  currentCategory = value;
+  syncCategoryUI();
+  rerender();
+}
 
 /* ============================================================
    ABCD: získání možností (autorské nebo generované)
@@ -254,12 +291,12 @@ function renderDashboard(main) {
       <div class="bar"><div class="bar-seg know" style="width:${p}%"></div>
         <div class="bar-seg repeat" style="width:${pct(cc.repeat,cc.total)}%"></div>
         <div class="bar-seg dont" style="width:${pct(cc.dont,cc.total)}%"></div></div>`;
-    card.addEventListener("click", () => { currentCategory = cat.key; renderMode("overview"); syncCategoryUI(); });
+    card.addEventListener("click", () => { currentCategory = cat.key; syncCategoryUI(); navigate("overview"); });
     grid.appendChild(card);
   });
 
   main.querySelectorAll("[data-go]").forEach(b =>
-    b.addEventListener("click", () => renderMode(b.dataset.go)));
+    b.addEventListener("click", () => navigate(b.dataset.go)));
 }
 function pct(a, b) { return b ? (a / b) * 100 : 0; }
 
@@ -305,6 +342,7 @@ function renderOverview(main) {
     <div class="view-head"><h1>Kompletní přehled</h1>
       <p>Všechny otázky a odpovědi. Klikni na otázku pro rozbalení.</p></div>
     <div class="controls">
+      <select id="ovCat"></select>
       <button class="pill" id="toggleAnswers"></button>
       <button class="pill" id="expandAll">Rozbalit vše</button>
       <button class="pill" id="collapseAll">Sbalit vše</button>
@@ -319,6 +357,11 @@ function renderOverview(main) {
       <span class="count-tag" id="overviewCount"></span>
     </div>
     <div id="overviewList"></div>`;
+
+  const ovCat = $("#ovCat", main);
+  ovCat.innerHTML = catOptionsHtml();
+  ovCat.value = currentCategory;
+  ovCat.addEventListener("change", e => onCategoryChange(e.target.value, renderOverviewList));
 
   $("#statusFilter", main).value = overviewState.statusFilter;
   updateToggleAnswersBtn();
@@ -434,7 +477,7 @@ function buildQuestionCard(q) {
 let flash = { deck: [], idx: 0, flipped: false, onlyDont: false, cat: "all" };
 
 function buildFlashDeck() {
-  let list = QUESTIONS.filter(q => flash.cat === "all" || q.category === flash.cat);
+  let list = QUESTIONS.filter(q => currentCategory === "all" || q.category === currentCategory);
   if (flash.onlyDont) {
     list = list.filter(q => store.status[q.id] === "dont" || store.status[q.id] === "repeat" || store.wrong[q.id]);
   }
@@ -443,7 +486,6 @@ function buildFlashDeck() {
 }
 
 function renderFlashcards(main) {
-  if (flash.cat === "all" && currentCategory !== "all") flash.cat = currentCategory;
   buildFlashDeck();
   main.innerHTML = `
     <div class="view-head"><h1>Flashcards</h1>
@@ -459,10 +501,11 @@ function renderFlashcards(main) {
     </div>`;
 
   const sel = $("#flashCat", main);
-  sel.innerHTML = `<option value="all">Všechny kategorie</option>` +
-    CATEGORIES.map(c => `<option value="${c.key}">${escapeHtml(c.label)}</option>`).join("");
-  sel.value = flash.cat;
-  sel.addEventListener("change", e => { flash.cat = e.target.value; flash.idx = 0; flash.flipped = false; buildFlashDeck(); renderFlashArea(); });
+  sel.innerHTML = catOptionsHtml();
+  sel.value = currentCategory;
+  sel.addEventListener("change", e => onCategoryChange(e.target.value, () => {
+    flash.idx = 0; flash.flipped = false; buildFlashDeck(); renderFlashArea();
+  }));
   $("#flashOnlyDont", main).addEventListener("click", e => {
     flash.onlyDont = !flash.onlyDont; flash.idx = 0; flash.flipped = false;
     e.target.classList.toggle("active", flash.onlyDont); buildFlashDeck(); renderFlashArea();
@@ -539,8 +582,7 @@ function abcdEligible(cat) {
     q.type !== "trueFalse");
 }
 function renderAbcd(main) {
-  if (abcd.cat === "all" && currentCategory !== "all") abcd.cat = currentCategory;
-  abcd.deck = shuffle(abcdEligible(abcd.cat).map(q => q.id));
+  abcd.deck = shuffle(abcdEligible(currentCategory).map(q => q.id));
   abcd.idx = 0; abcd.answered = false;
   main.innerHTML = `
     <div class="view-head"><h1>ABCD test</h1>
@@ -552,10 +594,9 @@ function renderAbcd(main) {
       <div id="abcdArea"></div>
     </div>`;
   const sel = $("#abcdCat", main);
-  sel.innerHTML = `<option value="all">Všechny kategorie</option>` +
-    CATEGORIES.map(c => `<option value="${c.key}">${escapeHtml(c.label)}</option>`).join("");
-  sel.value = abcd.cat;
-  sel.addEventListener("change", e => { abcd.cat = e.target.value; renderAbcd(main); });
+  sel.innerHTML = catOptionsHtml();
+  sel.value = currentCategory;
+  sel.addEventListener("change", e => onCategoryChange(e.target.value, () => renderAbcd(main)));
   abcdSession = { answered: 0, correct: 0 };
   renderAbcdQuestion();
 }
@@ -632,21 +673,34 @@ function abcdAnswer(chosen) {
 let tf = { deck: [], idx: 0, answered: false, correct: 0, total: 0 };
 
 function renderTrueFalse(main) {
-  tf.deck = shuffle(TRUE_FALSE.map((_, i) => i));
+  tf.deck = shuffle(TRUE_FALSE
+    .map((item, i) => ({ item, i }))
+    .filter(x => currentCategory === "all" || x.item.category === currentCategory)
+    .map(x => x.i));
   tf.idx = 0; tf.answered = false; tf.correct = 0; tf.total = 0;
   main.innerHTML = `
     <div class="view-head"><h1>Pravda / Nepravda</h1>
       <p>Typické chytáky. Rozhodni, zda tvrzení platí, a přečti si vysvětlení.</p></div>
     <div class="quiz-wrap">
-      <div class="flash-toolbar"><div class="spacer"></div><span class="count-tag" id="tfScore"></span></div>
+      <div class="flash-toolbar"><select id="tfCat"></select><div class="spacer"></div><span class="count-tag" id="tfScore"></span></div>
       <div class="quiz-progress-bar"><div id="tfBar"></div></div>
       <div id="tfArea"></div>
     </div>`;
+  const sel = $("#tfCat", main);
+  sel.innerHTML = catOptionsHtml();
+  sel.value = currentCategory;
+  sel.addEventListener("change", e => onCategoryChange(e.target.value, () => renderTrueFalse(main)));
   renderTfQuestion();
 }
 function renderTfQuestion() {
   const area = $("#tfArea");
   if (!area) return;
+  if (!tf.deck.length) {
+    $("#tfBar").style.width = "0%";
+    $("#tfScore").textContent = "";
+    area.innerHTML = `<div class="empty"><div class="big">🤷</div>Pro tuto kategorii nejsou žádná tvrzení.<br>Zkus jinou kategorii nebo „Všechny kategorie".</div>`;
+    return;
+  }
   $("#tfBar").style.width = (tf.idx / tf.deck.length) * 100 + "%";
   $("#tfScore").textContent = `${tf.idx}/${tf.deck.length} · skóre ${tf.correct}/${tf.total}`;
   if (tf.idx >= tf.deck.length) {
@@ -698,8 +752,7 @@ function tfAnswer(choice) {
 let written = { deck: [], idx: 0, revealed: false, cat: "all" };
 
 function renderWritten(main) {
-  if (written.cat === "all" && currentCategory !== "all") written.cat = currentCategory;
-  written.deck = shuffle(QUESTIONS.filter(q => written.cat === "all" || q.category === written.cat).map(q => q.id));
+  written.deck = shuffle(QUESTIONS.filter(q => currentCategory === "all" || q.category === currentCategory).map(q => q.id));
   written.idx = 0; written.revealed = false;
   main.innerHTML = `
     <div class="view-head"><h1>Psaná odpověď</h1>
@@ -710,10 +763,9 @@ function renderWritten(main) {
       <div id="wrArea"></div>
     </div>`;
   const sel = $("#wrCat", main);
-  sel.innerHTML = `<option value="all">Všechny kategorie</option>` +
-    CATEGORIES.map(c => `<option value="${c.key}">${escapeHtml(c.label)}</option>`).join("");
-  sel.value = written.cat;
-  sel.addEventListener("change", e => { written.cat = e.target.value; renderWritten(main); });
+  sel.innerHTML = catOptionsHtml();
+  sel.value = currentCategory;
+  sel.addEventListener("change", e => onCategoryChange(e.target.value, () => renderWritten(main)));
   renderWrQuestion();
 }
 function renderWrQuestion() {
@@ -777,26 +829,42 @@ function weakQuestions() {
     store.status[q.id] === "dont" || store.status[q.id] === "repeat" || store.wrong[q.id]);
 }
 function renderWeak(main) {
-  const list = weakQuestions();
+  const all = weakQuestions();
+  const list = all.filter(q => currentCategory === "all" || q.category === currentCategory);
   main.innerHTML = `
     <div class="view-head"><h1>Slabá místa</h1>
       <p>Otázky označené „neumím" / „opakovat" nebo na které jsi v testu odpověděl špatně.</p></div>`;
-  if (!list.length) {
+  if (!all.length) {
     main.innerHTML += `<div class="empty"><div class="big">🌟</div>Zatím nemáš žádná slabá místa.<br>
       Označ otázky v přehledu nebo si udělej test.</div>`;
     return;
   }
   const bar = el("div", "quick-actions");
-  bar.innerHTML = `<button class="quick-btn" data-w="flash">▤ Procvičit jako flashcards</button>
+  bar.innerHTML = `<select id="weakCat"></select>
+    <button class="quick-btn" data-w="flash">▤ Procvičit jako flashcards</button>
     <button class="quick-btn" data-w="abcd">▦ ABCD jen ze slabých</button>
     <span class="count-tag" style="align-self:center">${list.length} otázek</span>`;
   main.appendChild(bar);
+  const sel = $("#weakCat", main);
+  sel.innerHTML = catOptionsHtml();
+  sel.value = currentCategory;
+  sel.addEventListener("change", e => onCategoryChange(e.target.value, () => renderWeak(main)));
   bar.querySelector('[data-w="flash"]').addEventListener("click", () => {
-    flash = { deck: [], idx: 0, flipped: false, onlyDont: true, cat: "all" };
-    renderMode("flashcards");
+    flash.onlyDont = true; flash.idx = 0; flash.flipped = false;
+    navigate("flashcards");
   });
-  bar.querySelector('[data-w="abcd"]').addEventListener("click", () => startWeakAbcd(list));
+  bar.querySelector('[data-w="abcd"]').addEventListener("click", () => {
+    if (!list.length) return;
+    navStack.push({ mode: "weak", category: currentCategory });
+    startWeakAbcd(list);
+    updateBackBtn();
+  });
 
+  if (!list.length) {
+    main.appendChild(el("div", "empty",
+      `<div class="big">🤷</div>V této kategorii nemáš žádná slabá místa. Přepni na „Všechny kategorie".`));
+    return;
+  }
   const wrap = el("div");
   const prevSearch = searchTerm; searchTerm = "";
   list.forEach(q => wrap.appendChild(buildQuestionCard(q)));
@@ -804,8 +872,9 @@ function renderWeak(main) {
   main.appendChild(wrap);
 }
 function startWeakAbcd(list) {
+  currentMode = "abcd";
+  document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === "abcd"));
   renderAbcd($("#main"));
-  abcd.cat = "all";
   abcd.deck = shuffle(list.map(q => q.id));
   abcd.idx = 0; abcdSession = { answered: 0, correct: 0 };
   const sel = $("#abcdCat"); if (sel) sel.style.display = "none";
@@ -838,7 +907,7 @@ function renderExam(main) {
         </div></div>
       <button class="btn primary" id="exStart" style="margin-top:6px">Spustit test ▸</button>
     </div>`;
-  $("#exCat", main).value = exam.cat;
+  $("#exCat", main).value = currentCategory;
   main.querySelectorAll("#exCount .opt-chip").forEach(b => b.addEventListener("click", () => {
     exam.count = +b.dataset.n;
     main.querySelectorAll("#exCount .opt-chip").forEach(x => x.classList.toggle("active", x === b));
@@ -847,13 +916,13 @@ function renderExam(main) {
     exam.mode = b.dataset.m;
     main.querySelectorAll("#exMode .opt-chip").forEach(x => x.classList.toggle("active", x === b));
   }));
-  $("#exCat", main).addEventListener("change", e => exam.cat = e.target.value);
+  $("#exCat", main).addEventListener("change", e => { currentCategory = e.target.value; syncCategoryUI(); });
   $("#exStart", main).addEventListener("click", startExam);
 }
 
 function startExam() {
-  const pool = QUESTIONS.filter(q => exam.cat === "all" || q.category === exam.cat);
-  const tfPool = TRUE_FALSE.filter(t => exam.cat === "all" || t.category === exam.cat);
+  const pool = QUESTIONS.filter(q => currentCategory === "all" || q.category === currentCategory);
+  const tfPool = TRUE_FALSE.filter(t => currentCategory === "all" || t.category === currentCategory);
   let items = [];
   if (exam.mode === "abcd" || exam.mode === "written") {
     items = sample(pool, exam.count).map(q => ({ kind: exam.mode, q }));
@@ -1007,7 +1076,7 @@ function renderExamResult() {
   }
   main.innerHTML = html;
   $("#exRestart").addEventListener("click", () => renderExam(main));
-  const w = $("#exToWeak"); if (w) w.addEventListener("click", () => renderMode("weak"));
+  const w = $("#exToWeak"); if (w) w.addEventListener("click", () => navigate("weak"));
 }
 
 /* ============================================================
@@ -1090,8 +1159,8 @@ function buildCategorySidebar() {
   wrap.querySelectorAll(".cat-item").forEach(b => b.addEventListener("click", () => {
     currentCategory = b.dataset.cat;
     syncCategoryUI();
-    if (currentMode !== "overview" && currentMode !== "flashcards" && currentMode !== "written") {
-      renderMode("overview");
+    if (currentMode === "dashboard" || currentMode === "stats") {
+      navigate("overview");
     } else {
       renderMode(currentMode);
     }
@@ -1114,7 +1183,11 @@ function init() {
   updateMiniBar();
 
   document.querySelectorAll(".mode-btn").forEach(b =>
-    b.addEventListener("click", () => renderMode(b.dataset.mode)));
+    b.addEventListener("click", () => navigate(b.dataset.mode)));
+
+  // tlačítko Zpět + logo = domů
+  $("#backBtn").addEventListener("click", goBack);
+  $("#brandHome").addEventListener("click", () => navigate("dashboard"));
 
   // vyhledávání
   let searchT = null;
@@ -1123,7 +1196,7 @@ function init() {
     clearTimeout(searchT);
     searchT = setTimeout(() => {
       if (searchTerm && currentMode !== "overview") {
-        renderMode("overview");
+        navigate("overview");
       } else if (currentMode === "overview") {
         renderOverviewList();
       }
@@ -1140,7 +1213,9 @@ function init() {
       store = defaultStore();
       saveStore();
       updateMiniBar();
+      navStack = []; currentCategory = "all"; syncCategoryUI();
       renderMode("dashboard");
+      updateBackBtn();
       toast("Pokrok byl vynulován");
     }
   });
